@@ -12,9 +12,16 @@ import (
 )
 
 func newThread(c *gin.Context) {
+	u, err := checkCookie(c)
+	if err != nil {
+		c.String(http.StatusUnauthorized, "not logged in")
+		return
+	}
+
 	var n ForumThread
 
-	if c.BindJSON(&n) != nil {
+	if err = c.BindJSON(&n); err != nil {
+		log.Println(err)
 		c.String(http.StatusBadRequest, "Failed to bind json")
 		return
 	}
@@ -22,7 +29,7 @@ func newThread(c *gin.Context) {
 	previousID++
 	threads[previousID] = ForumThread{
 		ID:		previousID,
-		OriginalPoster:	n.OriginalPoster,
+		OriginalPoster:	u.ID,
 		Title:		n.Title,
 		Content:	n.Content,
 		Date:		time.Now(),
@@ -53,6 +60,12 @@ func readThread(c *gin.Context) {
 }
 
 func reply(c *gin.Context) {
+	u, err := checkCookie(c)
+	if err != nil {
+		c.String(http.StatusUnauthorized, "not logged in")
+		return
+	}
+
 	var reply struct {
 		Poster		int64	`json: "poster"`
 		Content		string	`json: "content"`
@@ -78,7 +91,7 @@ func reply(c *gin.Context) {
 
 	replies[thread] = ThreadReplies{
 		ThreadID:	thread,
-		Poster:		append(replies[thread].Poster, reply.Poster),
+		Poster:		append(replies[thread].Poster, u.ID),
 		Content:	append(replies[thread].Content, reply.Content),
 		Votes:		append(replies[thread].Votes, 0),
 	}
@@ -162,13 +175,19 @@ func startServer() {
 		c.String(http.StatusOK, "pong")
 	})
 
+	// Thread requests
 	router.POST("/api/new", newThread)
 	router.GET("/api/read/:id", readThread)
 	router.GET("/api/read", readThreads)
 	//router.POST("/api/vote/:thread/:vote", voteThread)
 
+	// Reply requests
 	router.POST("/api/reply/:thread", reply)
 	router.GET("/api/replies/:thread", readReplies)
+
+	// User related requests (see user.c)
+	router.POST("/api/signup", signup)
+	router.POST("/api/signin", signin)
 
 	if err := router.Run(":8080"); err != nil {
 		log.Fatal(err)

@@ -50,6 +50,8 @@ func main() {
 
 	threads = make(map[int64]ForumThread)
 	replies = make(map[int64]ThreadReplies)
+	sessions = make(map[string]Session)
+
 	previousID = 0
 
 	initDb(os.Getenv("DBUSER"), os.Getenv("DBPASS"))
